@@ -155,3 +155,153 @@ MYSQL_DB_USER=root
 MYSQL_DB_PASSWORD=your_password
 DB_NAME=duck_stake
 
+# Redis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+# JWT
+JWT_SECRET_KEY=your_jwt_secret_key
+JWT_EXPIRE=24h
+
+# OKX Web3 API (for token pricing)
+OKX_apiKey=your_okx_api_key
+OKX_SECRETKEY=your_okx_secret_key
+OKX_passphrase=your_okx_passphrase
+OK_ACCESS_PROJECT=your_okx_project_id
+
+# OKLink API (for chain list sync)
+OKLINK_API_KEY=your_oklink_api_key
+```
+
+---
+
+## Getting Started
+
+```bash
+# 1. Clone the repository
+git clone <repo-url>
+cd duck-stake-be
+
+# 2. Install dependencies
+npm install
+
+# 3. Create .env (see Environment Variables section above)
+cp .env.example .env
+# Edit .env with your actual credentials
+
+# 4. Start the main API server
+node service/app.js
+
+# 5. Start background workers (in separate processes / terminal tabs)
+node service/eggs/scannerStakeData.js
+node service/eggs/integralCalculate.js
+node service/eggs/integralInAccount.js
+node service/tokenPrice/syncTokenPrice.js
+node service/tokenPrice/syncChainList.js
+```
+
+The API server listens on **`http://localhost:9009`**.
+
+---
+
+## API Reference
+
+All responses follow the structure:
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "data": { ... }
+}
+```
+
+Error responses return `code: 500` with `data: false`. Authentication errors return `code: 401`.
+
+---
+
+### User Endpoints — `/user`
+
+#### `GET /user/evm_connect`
+
+Authenticate an EVM wallet via signature. Returns a JWT token.
+
+**Query Parameters**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `address` | string | Yes | EVM wallet address (0x...) |
+| `sign` | string | Yes | Signature of the message `"Welcome to DuckChain"` |
+| `inviteCode` | string | No | Referrer's invite code |
+| `smartAddress` | string | No | Associated smart contract wallet address |
+
+**Response**
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "data": { "token": "<jwt>" }
+}
+```
+
+---
+
+#### `GET /user/btc_login`
+
+Authenticate a BTC wallet via ECDSA signature.
+
+**Query Parameters**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `sig` | string | Yes | Base64-encoded compact ECDSA signature |
+| `inviteCode` | string | No | Referrer's invite code |
+
+> Note: `address` and `publicKey` must be injected into `req` by upstream middleware before reaching this route.
+
+**Response** — same shape as `/user/evm_connect`.
+
+---
+
+#### `GET /user/check_login` 🔒
+
+Verify that the current JWT token is valid. Returns the authenticated wallet address.
+
+**Headers**: `Authorization: Bearer <jwt>`
+
+**Response**
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "data": { "walletAddress": "0x..." }
+}
+```
+
+---
+
+#### `GET /user/info` 🔒
+
+Retrieve the authenticated user's profile and total accumulated points (eggs).
+
+**Headers**: `Authorization: Bearer <jwt>`
+
+**Response**
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "data": {
+    "address": "0x...",
+    "inviterAddress": "0x...",
+    "inviteCode": "ABC123",
+    "eggTotal": 12450.5
+  }
+}
+```
+
+---
+
