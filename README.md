@@ -305,3 +305,154 @@ Retrieve the authenticated user's profile and total accumulated points (eggs).
 
 ---
 
+#### `GET /user/bind_invite` 🔒
+
+Bind a referrer's invite code to the authenticated user. Can only be set once.
+
+**Headers**: `Authorization: Bearer <jwt>`
+
+**Query Parameters**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `inviteCode` | string | Yes | Invite code of the referrer |
+
+**Response** — `data: true` on success, `data: false` if already bound or code invalid.
+
+---
+
+#### `GET /user/check_invite` 🔒
+
+Check whether the authenticated user has a bound referrer.
+
+**Headers**: `Authorization: Bearer <jwt>`
+
+**Response**
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "data": { "hasInviter": true }
+}
+```
+
+---
+
+### Staking Endpoints — `/stack`
+
+#### `GET /stack/records`
+
+Retrieve paginated staking (cross-chain deposit) records for a wallet address. Each record's `amount` is expressed in USD using the latest cached token price.
+
+**Query Parameters**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `address` | string | Yes | Wallet address to query |
+| `page` | number | Yes | Page number (1-based) |
+| `pageSize` | number | Yes | Number of records per page |
+
+**Response**
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "data": [
+    {
+      "id": 1,
+      "chanId": "TON_STAKING",
+      "tokenSymbol": "TON",
+      "txHash": "abc123...",
+      "recipient": "UQ...",
+      "amount": 25.48,
+      "txTime": 1722200000
+    }
+  ]
+}
+```
+
+---
+
+## Background Services
+
+All background workers run as standalone Node.js processes and should be managed with a process manager such as **PM2** in production.
+
+| Service | File | Interval | Description |
+|---|---|---|---|
+| Stake Data Scanner | `eggs/scannerStakeData.js` | Every 18 seconds | Polls the DuckChain bridge API for new deposit events and stores them in `cross_chain_records`. Uses a Redis-backed page cursor to resume after restart. |
+| Token Price Sync | `tokenPrice/syncTokenPrice.js` | Every hour | Fetches current token prices and stores them in a Redis hash (`duck_stake_token_price`). |
+| Chain List Sync | `tokenPrice/syncChainList.js` | Every 24 hours | Syncs the full chain list from OKX Link API into the `chains` table. |
+| Integral Calculator | `eggs/integralCalculate.js` | Daily at 00:00 (cron) | Calculates points earned from new staking deposits and writes to `integral_records`. Uses Redis set keys to prevent double-counting. |
+| Integral Crediting | `eggs/integralInAccount.js` | Every 18 seconds | Reads uncredited rows from `integral_records` and applies them to the `integral` aggregate table. |
+
+---
+
+## Points System
+
+DuckChain awards **points (eggs)** to users based on the USD value of their staked assets.
+
+### Formula
+
+```
+points_earned = total_staked_amount × token_price_USD × 3
+```
+
+### Referral Bonus
+
+When a user has a bound referrer, both parties receive a bonus on each staking deposit:
+
+```
+bonus = points_earned × 0.05  (5%)
+```
+
+- The **referrer** receives `bonus` added to their `integral_records`.
+- The **staker** also receives `bonus` on top of their own base points.
+
+### Crediting Flow
+
+```
+New deposit arrives
+       │
+       ▼
+integralCalculate.js   ─── writes ──►  integral_records (credited=0)
+                                              │
+                                              ▼
+                                  integralInAccount.js
+                                  reads uncredited rows
+                                  upserts into `integral` table
+                                  marks rows credited=1
+```
+
+---
+
+## Database Schema
+
+The following tables are expected to exist. DDL scripts are maintained separately.
+
+| Table | Purpose |
+|---|---|
+| `sys_users` | Registered users: address, chain, invite code, inviter address, smart address |
+| `cross_chain_records` | Individual cross-chain deposit events (sid, sender, receiver, token, amount, txHash, txTime) |
+| `cross_chain_total_assets` | Aggregated staked token amounts per user per token |
+| `integral_records` | Per-deposit points calculation records (new_points, to_points, credited flag) |
+| `integral` | Aggregate points balance per user address |
+| `chains` | Blockchain registry (chain_name, chain_type, chain_Id) |
+| `tokens` | Token registry (chain_id, token_symbol, token_precision, contract_address) |
+| `quiz_progress` | Daily quiz completion tracking |
+| `task_progress` | Social task completion tracking |
+
+---
+
+## Multi-Chain Support
+
+| Chain | Auth Method | Library | Signing Message |
+|---|---|---|---|
+| EVM (Ethereum, etc.) | ECDSA signature recovery | `web3` | `"Welcome to DuckChain"` |
+| BTC (Bitcoin) | Bitcoin message signature (base64 compact) | `bitcore-lib` | `"Welcome to DuckChain"` |
+| TON | Address handled via tonweb | `tonweb` | — |
+
+TON addresses are normalized between raw (`0:xxxx`), user-friendly (`UQxx`), and URL-safe bounceable formats during token registration and staking record ingestion.
+
+Token prices for non-Binance-listed tokens (including TON ecosystem tokens) fall back to the **OKX DEX price API**, keyed by chain index and contract address.
