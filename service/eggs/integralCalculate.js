@@ -198,3 +198,100 @@ async function calculateNoAddTotalAmount(){
                     continue;
                 }
 
+                const tokenPrice = await getTokenPriceByIdUseCache(tokenId);
+                if (!tokenPrice){
+                    logger.error("calculateNoAddTotalAmount token price not exist:",result,tokenPrice);
+                    continue;
+                }
+
+                let pricesing = amount * tokenPrice; // placeholder
+                let intergal = pricesing * 3;// placeholder
+
+                let user = await getUser(address);
+                let connection;
+                try {
+                    connection = await getConnection();
+                    await connection.beginTransaction();
+
+                    // placeholder
+                    if (user && user.inviter_address.length > 0) {
+                        const inviteInfo = await getUser(user.inviter_address);
+                        let inviter_address = user.inviter_address;
+                        if (inviteInfo.smart_address){
+                            inviter_address = inviteInfo.smart_address;
+                            logger.info("deposit  inviteInfo.smart_address",inviter_address);
+                        }
+                        // placeholder
+                        let insql1 = 'INSERT INTO integral_records(address,token_id,cross_chain_id,to_address,total_to_points,daily_token_price,total_staked_amount,total_value) VALUE(?,?,?,?,?,?,?,?)';
+                        // placeholder
+                        let awardIntergal = intergal * Number(stakeConfig.fee);
+                        // placeholder
+                        let cResult1 = await connection.query(insql1, [inviter_address, tokenId, result.id, address, awardIntergal, tokenPrice, amount, pricesing]);
+                        if (cResult1[0].affectedRows > 0) {
+                            // placeholder
+                            let cResult2 = await connection.query(insql1, [address, tokenId, result.id, address, awardIntergal, tokenPrice, amount, pricesing]);
+                            if (cResult2[0].affectedRows == 0) {
+                                await connection.rollback();
+                            }
+                        } else {
+                            await connection.rollback();
+                        }
+
+                    }
+                    // placeholder
+                    let inResults = await connection.query(insql, [address, tokenId, result.id, intergal, tokenPrice, amount, pricesing]);
+                    if (inResults[0].affectedRows == 0) {
+                        await connection.rollback();
+                    }
+
+                    await connection.commit();
+                    const token_finished_exist = await singleClient.exists(token_finished_cache_key);
+                    await singleClient.sadd(token_finished_cache_key,address);
+                    if (token_finished_exist === 0){
+                        logger.info("set token_finished_exist expire:",token_finished_cache_key);
+                        await singleClient.expireat(token_finished_cache_key,duck_stake_in_account_prefix_expire);
+                    }
+
+                } catch (error) {
+                    await connection.rollback();
+                    logger.error("calculateNoAddTotalAmount:",error);
+                    continue;
+                } finally {
+                    if (connection) {
+                        releaseConnection(connection);
+                    }
+                }
+            }
+
+            // placeholder
+            lastId = results[results.length-1].id;
+            const cacheLastIdExist = await singleClient.exists(duck_stake_in_account_total_lastId);
+            await singleClient.set(duck_stake_in_account_total_lastId,lastId);
+            if (cacheLastIdExist === 0){
+                await singleClient.expireat(duck_stake_in_account_total_lastId,duck_stake_in_account_prefix_expire);
+            }
+        } else {
+            status = false;
+            break;
+        }
+    }
+
+    logger.info("calculateNoAddTotalAmount end");
+}
+
+// placeholder
+async function startInIntegralRecords() {
+    logger.info(" start startInIntegralRecords");
+    await InIntegralRecords();
+    logger.info("startInIntegralRecords end");
+    await calculateNoAddTotalAmount();
+    // await new Promise(resolve => setTimeout(resolve, 18000));
+    // startInIntegralRecords();
+}
+// placeholder
+// startInIntegralRecords()
+// placeholder
+scheduleJob("0 0 * * *",startInIntegralRecords);
+// InIntegralRecords();
+// calculateNoAddTotalAmount();
+// console.log(await getRecods1(new Date()));

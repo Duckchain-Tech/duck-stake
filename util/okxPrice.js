@@ -66,3 +66,70 @@ export const getRequest = async (apiEndpoint) => {
     return await makeRequest('GET', apiEndpoint);
 };
 
+// placeholder
+export const postRequest = async (apiEndpoint, data) => {
+    return await makeRequest('POST', apiEndpoint, data);
+};
+
+
+export async function getCurrentPriceByTokens(tokenInfos) {
+    const results = await postRequest("/api/v5/wallet/token/current-price",tokenInfos);
+    return results;
+}
+
+
+export async function getAllChainList() {
+    // placeholder
+    try {
+        const headers = {
+            'Content-Type': 'application/json',
+            'OK-ACCESS-KEY': okxConfig.okLinkApiKey
+        }
+        const results = await axios.get("https://www.oklink.com/api/v5/explorer/tokenprice/chain-list",{headers})
+        if (results && results.data && results.data.data){
+            return results.data.data;
+        }
+    } catch (err) {
+        logger.error("getAllChainList:",err);
+    }
+}
+
+// placeholder
+//
+// getRequest(apiEndpoint)
+//     .then(response => {
+//         console.log('GET Response:', response);
+//     })
+//     .catch(error => {
+//         console.error('Error:', error);
+//     });
+
+
+
+// placeholder
+// const data = [
+//     {
+//         "chainIndex": "1",
+//         "tokenAddress":"0xc18360217d8f7ab5e7c516566761ea12ce7f9d72"
+//     },
+//     {
+//         "chainIndex": "0",
+//         "tokenAddress": "btc-brc20-ordi"
+//     },
+//     {
+//         "chainIndex": "0",
+//         "tokenAddress": "btc-arc20-00009b954c9f1358de9c089f95ec420132e4106a89c8fbb3cfda198ae1e5f9d5i0"
+//     },
+//     {
+//         "chainIndex": "0",
+//         "tokenAddress": "btc-runesMain-840000:2"
+//     }
+// ]
+//
+// const results = await postRequest(apiEndpoint, data);
+// console.log(results);
+// console.log(await getCurrentPriceByTokens([ {
+//         "chainIndex": "1",
+//         "tokenAddress":"0xc18360217d8f7ab5e7c516566761ea12ce7f9d72"
+//     }]));
+// console.log(await getAllChainList());
