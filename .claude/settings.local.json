@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config:*)",
+      "Bash(git reset:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(GIT_AUTHOR_DATE=\"2026-03-19T10:15:00+08:00\" GIT_COMMITTER_DATE=\"2026-03-19T10:15:00+08:00\" git commit -m \"docs: add detailed English README with API reference and architecture\")"
+    ]
+  }
+}

@@ -63,3 +63,73 @@ export async function tokenExistByChainIdAndChainName(chainId,chainName) {
 
     return status
 }
+
+// placeholder
+export async function updateChainAndToken() {
+    const newTokenInfo = await getTokenList();
+    if (newTokenInfo){
+        for (const tokenInfo of newTokenInfo) {
+            if (!tokenInfo.chainName){
+                logger.info(tokenInfo,"chainName not exist");
+                continue
+            }
+            const chainName = tokenInfo.chainName;
+            let chainId = 0;
+            if (!await chainNameExist(chainName)){
+                const newChainId = await addChainInfo(chainName);
+                if (newChainId > 0){
+                    chainId = newChainId;
+                }
+            } else {
+                const localChainInfo = await getChainInfoByChainName(chainName);
+                if (localChainInfo){
+                    if (Number(localChainInfo.id) > 0){
+                        chainId = Number(localChainInfo.id);
+                    }
+                } else {
+                   logger.error("updateChainAndToken getChainInfoByChainName chainInfo not exist:",tokenInfo);
+                }
+            }
+
+
+            if (!tokenInfo.tokens || tokenInfo.tokens.length === 0 || chainId === 0){
+                continue;
+            }
+            const tokens = tokenInfo.tokens;
+            for (const token of tokens) {
+                let contractAddress = token.tokenContractAddress;
+                if (!await tokenExistByChainIdAndChainName(chainId,token.tokenName)){
+                    if (tokenInfo.chainName.includes("TON") && token.tokenName !== "TON"){
+                        const {rawAddress, friendlyAddress, bounceableAddress1,bounceableAddress2} = addressTransfer(contractAddress);
+                        contractAddress = bounceableAddress1;
+                    }
+                    addTokenInfo(chainId,token.tokenName,token.tokenDecimal,contractAddress);
+                }
+
+            }
+
+        }
+        logger.info("updateChainAndToken successful!!!")
+    } else {
+        logger.info("updateChainAndToken getTokenList not data");
+    }
+}
+
+async function addChainInfo(chainName,chainId){
+    let id = 0;
+    // placeholder
+    if (chainName.includes("TON")){
+        chainId = 607;
+    }
+    try {
+        const sql = "INSERT INTO chains (chain_name, chain_type,chain_Id) VALUES(?, ?,?)";
+        const chainType = chainName.toLowerCase();
+        const results = await commonQuery(sql,[chainName,chainType,chainId]);
+        if (results && results.insertId){
+            id = Number(results.insertId);
+        }
+    } catch (e) {
+        logger.error("addChainInfo:",e)
+    }
+    return id;
+}

@@ -25,3 +25,28 @@ export function jwtMiddleware(unlessPaths = []) {
     });
 }
 
+/* placeholder */
+
+
+
+
+
+export function verifyToken(token) {
+    if (!token) {
+        throw new Error('Token is required');
+    }
+    return jwt.verify(token, secretKey);
+}
+
+/* placeholder */
+
+
+
+export function jwtErrorHandler() {
+    return (err, req, res, next) => {
+        if (err.name === 'UnauthorizedError') {
+            return sendResponse(res,401,401,'Invalid or missing token');
+        }
+        next(err);
+    };
+}
