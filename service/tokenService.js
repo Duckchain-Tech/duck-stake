@@ -133,3 +133,61 @@ async function addChainInfo(chainName,chainId){
     }
     return id;
 }
+
+export async function getChainInfoByChainName(chainName) {
+    const sql = "SELECT id,chain_name,chain_type FROM chains WHERE chain_name=?";
+    try {
+        const results = await commonQuery(sql,[chainName]);
+        if (results && results[0]){
+            return  results[0];
+        }
+    } catch (e) {
+        logger.error("getChainInfoByChainName:",e)
+    }
+}
+
+async function addTokenInfo(chainId,tokenSymbol,decimals,contractAddress){
+    const sql = "INSERT INTO tokens (chain_id, token_symbol, token_precision,contract_address) VALUES(?,?, ?,?)";
+    try {
+        commonQuery(sql,[chainId,tokenSymbol,decimals,contractAddress]);
+    } catch (e) {
+        logger.error("addTokenInfo:",e);
+    }
+
+
+}
+
+export async function getTokenInfoAndChainInfoList(){
+    const sql = "SELECT t.*,c.chain_Id as chainId,c.chain_name,c.chain_type FROM tokens t,chains c WHERE t.chain_id = c.id";
+    const results = await commonQuery(sql,[]);
+    return results;
+}
+
+export async function chainNameAndIdExist(chainName,chainId) {
+    const sql = "SELECT id FROM chains WHERE chain_name=? and chain_Id=?";
+    let status = false;
+    try {
+        const results = await commonQuery(sql,[chainName,chainId]);
+        if (results && results[0] && results[0].id){
+            status = true;
+        }
+    } catch (e) {
+        logger.error("chainNameExist:",e)
+    }
+
+    return status
+}
+
+export async function addChainApiInfo(chainId,chainFullName,chainShortName) {
+    const sql = "INSERT INTO chains (chain_name, chain_type,chain_Id, chain_full_name) VALUES(?, ?, ?, ?)";
+    commonQuery(sql,[chainShortName,chainShortName.toLowerCase(),chainId,chainFullName]);
+}
+
+// console.log(await  getTokenIdByChainName('NOT','TON_STAKING'))
+// console.log(await getAllTokenSymbol())
+// console.log(await chainNameExist("BTC"));
+// console.log(await tokenExistByChainIdAndChainName(3,"Not"));
+// updateChainAndToken();
+// addChainInfo("etc")
+// console.log(await getTokenInfoAndChainInfoList());
+// console.log(await chainNameAndIdExist("BTC",1));
